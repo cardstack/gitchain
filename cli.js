@@ -30,23 +30,21 @@ class CLI {
 
     let commits = await this.getCommits(repoPath);
 
-    let commit = commits[0];
+    for (let commit of commits) {
+      let transaction = {
+        "type": "COMMIT",
+        "id": commit.sha()
+      };
 
-    let transaction = {
-      "type": "COMMIT",
-      "id": commit.sha()
-    };
+      let privateKey = this.readPrivateKey();
+      let batchData = await submitAndPoll({ privateKey, transaction });
 
-    let privateKey = this.readPrivateKey();
-    let batchData = await submitAndPoll({ privateKey, transaction });
+      let commitTransaction = batchData.data.transactions[0];
+      let commitPayload = decodePayload(commitTransaction.payload);
+      let commitAddress = transactionAddress(commitPayload);
 
-    let commitTransaction = batchData.data.transactions[0];
-    let commitPayload = decodePayload(commitTransaction.payload);
-    let commitAddress = transactionAddress(commitPayload);
-
-    this.log("Transaction address", restApiUrl(`state/${commitAddress}`));
-
-    return commitPayload;
+      this.log("Transaction address", restApiUrl(`state/${commitAddress}`));
+    }
   }
 
   async benchmark() {
