@@ -11,6 +11,7 @@ const { transactionAddress }          = require("./utils/address");
 const logger                          = require('debug')('gitchain-cli');
 const Git                             = require("nodegit");
 const { restApiUrl }                  = require('./utils/config');
+const { writeToBlobStream }           = require('./lib/blob-storage');
 
 
 class CLI {
@@ -25,10 +26,43 @@ class CLI {
     return await this[this.command].call(this);
   }
 
-  async push () {
-    let [repoPath] = this.arguments;
+  async storeCommit(commit) {
+    let header = commit.rawHeader();
+    this.log(`Storing commit ${commit.sha()}`);
+    await writeToBlobStream(commit.sha(), header);
 
-    let commits = await this.getCommits(repoPath);
+    await this.storeTree(await commit.getTree());
+  }
+
+  async storeTree(tree) {
+    let rawTree = await this.gitCommand(`cat-file -p ${tree.id()}`);
+    await writeToBlobStream(tree.id().toString(), rawTree);
+
+    for (let entry of tree.entries()) {
+      if (entry.isTree()) {
+        await this.storeTree(await entry.getTree());
+      } else if (entry.isBlob()) {
+        let blob = await entry.getBlob();
+        this.log(`Writing blob ${entry.name()} ${entry.sha()}`);
+        let content;
+        if (blob.isBinary()) {
+          content = blob.rawcontent().toBuffer(blob.rawsize());
+        } else {
+          content = blob.toString();
+        }
+        await writeToBlobStream(entry.sha(), content);
+      }
+    }
+  }
+
+  async gitCommand(cmd) {
+    return await shellCommand(`git --git-dir=${this.repoPath}/.git ${cmd}`);
+  }
+
+  async push () {
+    [this.repoPath] = this.arguments;
+
+    let commits = await this.getCommits(this.repoPath);
 
     for (let commit of commits) {
       let transaction = {
@@ -42,6 +76,8 @@ class CLI {
       let commitTransaction = batchData.data.transactions[0];
       let commitPayload = decodePayload(commitTransaction.payload);
       let commitAddress = transactionAddress(commitPayload);
+
+      await this.storeCommit(commit);
 
       this.log("Transaction address", restApiUrl(`state/${commitAddress}`));
     }
@@ -94,7 +130,7 @@ class CLI {
 
 const opts = {
   keydir: {
-    required: true,
+    required: false,
     short: 'k'
   }
 };
