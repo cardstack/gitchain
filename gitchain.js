@@ -46,11 +46,11 @@ class Gitchain {
   }
 
   async gitCommand(cmd) {
-    return await shellCommand(`git --git-dir=${this.repoPath}/.git ${cmd}`);
+    return await shellCommand(`git --git-dir=${this.repoPath} ${cmd}`);
   }
 
-  async push() {
-    let commits = await this.getCommits(this.repoPath);
+  async push(commit) {
+    let commits = await this.getCommits(this.repoPath, commit);
 
     for (let commit of commits) {
       let transaction = {
@@ -71,9 +71,9 @@ class Gitchain {
     }
   }
 
-  async getCommits(repoPath) {
-    let repo = await Git.Repository.open(repoPath);
-    let masterCommit = await repo.getMasterCommit();
+  async getCommits(repoPath, commit) {
+    let repo = await Git.Repository.openBare(repoPath);
+    let masterCommit = await repo.getCommit(commit);
     return await new Promise((resolve, reject) => {
       let eventEmitter = masterCommit.history(Git.Revwalk.SORT.REVERSE);
       eventEmitter.on('end', commits => {
