@@ -90,7 +90,11 @@ class Gitchain {
   }
 
   readPrivateKey() {
-    return readFileSync(resolve(this.keydir, 'sawtooth.priv'), 'utf8');
+    if (process.env.SAWTOOTH_PRIVATE_KEY) {
+      return process.env.SAWTOOTH_PRIVATE_KEY;
+    } else {
+      return readFileSync(resolve(this.keydir, 'sawtooth.priv'), 'utf8');
+    }
   }
 
 }
