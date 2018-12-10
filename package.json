@@ -1,6 +1,6 @@
 {
   "name": "cardstack-gitchain",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -17,6 +17,9 @@
     "cbor": "^4.1.1",
     "concat-stream": "^1.6.2",
     "fs-blob-store": "^5.2.1",
+    "koa": "^2.6.2",
+    "koa-body": "^4.0.4",
+    "koa-router": "^7.4.0",
     "nodegit": "^0.23.0",
     "options-parser": "^0.4.0",
     "promisepipe": "^3.0.0",

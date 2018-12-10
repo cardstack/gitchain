@@ -5,7 +5,7 @@ const { submitAndPoll }       = require('./lib/send-transaction');
 const { decodePayload }       = require('./utils/encryption');
 const { transactionAddress }  = require("./utils/address");
 const Git                     = require("nodegit");
-const { writeToBlobStream }   = require('./lib/blob-storage');
+const { writeToBlobStream, blobStoreMeta }   = require('./lib/blob-storage');
 const { resolve }             = require('path');
 const defaultLogger           = require('debug')('gitchain');
 
@@ -55,7 +55,12 @@ class Gitchain {
     for (let commit of commits) {
       let transaction = {
         "type": "COMMIT",
-        "id": commit.sha()
+        "id": commit.sha(),
+        data: {
+          attributes: {
+            'blob-store-info': blobStoreMeta()
+          }
+        }
       };
 
       let privateKey = this.readPrivateKey();
