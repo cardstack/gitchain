@@ -27,6 +27,14 @@ class CLI {
     await gitchain.push();
   }
 
+  async clone() {
+   let [repoPath, headSha] = this.arguments;
+
+   let gitchain = new Gitchain(repoPath, this.options.keydir, { logger: this.log });
+
+   await gitchain.clone(headSha);
+  }
+
   async keygen() {
     await shellCommand(`mkdir -p "${this.options.keydir}"`);
 
