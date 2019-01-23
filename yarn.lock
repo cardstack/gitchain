@@ -285,6 +285,10 @@ cbor@^4.1.1:
     json-text-sequence "^0.1"
     nofilter "^0.0.3"
 
+chdir@^0.0.0:
+  version "0.0.0"
+  resolved "https://registry.yarnpkg.com/chdir/-/chdir-0.0.0.tgz#c29bdb85f391834c83ddbf090f18a11b0ed96bee"
+
 chownr@^1.0.1:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/chownr/-/chownr-1.1.1.tgz#54726b8b8fff4df053c42187e801fb4412df1494"

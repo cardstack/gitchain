@@ -6,6 +6,7 @@ const Git                     = require("nodegit");
 const defaultLogger           = require('debug')('gitchain');
 const request                 = require('request-promise-native');
 const { get }                 = require('lodash');
+const chdir                   = require('chdir');
 
 const { writeToBlobStream, readFromBlobStream, blobStoreMeta }   = require('./lib/blob-storage');
 const { transactionAddress, commitAddress }  = require("./utils/address");
@@ -67,7 +68,9 @@ class Gitchain {
   }
 
   async gitCommand(cmd) {
-    return await shellCommand(`git --git-dir=${this.gitDir} ${cmd}`);
+    return await chdir(this.repoPath, async () =>
+      await shellCommand(`git ${cmd}`)
+    );
   }
 
   async push(commit) {
@@ -130,6 +133,7 @@ class Gitchain {
     } while (currentSha);
 
     writeFileSync(join(this.gitDir, 'refs/heads/master'), headSha);
+    this.gitCommand('reset --hard');
   }
 
   async getCommitDataFromBlockchain(sha) {
