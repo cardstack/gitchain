@@ -1,17 +1,18 @@
-const { shellCommand }        = require('./utils/async');
 const { restApiUrl }          = require('./utils/config');
 const { submitAndPoll }       = require('./lib/send-transaction');
 const { decodePayload }       = require('./utils/encryption');
-const Git                     = require("nodegit");
 const defaultLogger           = require('debug')('gitchain');
 const request                 = require('request-promise-native');
 const { get }                 = require('lodash');
-const chdir                   = require('chdir');
+
+const fs = require('fs');
+const Git = require('isomorphic-git');
+Git.plugins.set('fs', fs);
 
 const { writeToBlobStream, readFromBlobStream, blobStoreMeta }   = require('./lib/blob-storage');
 const { transactionAddress, commitAddress }  = require("./utils/address");
-const { readFileSync, existsSync, writeFileSync, mkdirSync }        = require('fs');
-const { resolve, join, dirname }             = require('path');
+const { readFileSync, existsSync }        = require('fs');
+const { resolve, join }             = require('path');
 
 class Gitchain {
   constructor(repoPath, keydir, { logger }) {
@@ -22,55 +23,63 @@ class Gitchain {
   }
 
   async storeCommit(commit) {
-    this.log(`Storing commit ${commit.sha()}`);
-    await writeToBlobStream(commit.sha(), this.readObject(commit.sha()));
+    this.log(`Storing commit ${commit.oid}`);
+    await writeToBlobStream(commit.oid, await this.readObject(commit.oid));
 
-    await this.storeTree(await commit.getTree());
+
+    await this.storeTree(commit.tree);
   }
 
-  async storeTree(tree) {
-    await writeToBlobStream(tree.id().toString(), this.readObject(tree.id().toString()));
+  async storeTree(treeId) {
+    await writeToBlobStream(treeId, await this.readObject(treeId));
 
-    for (let entry of tree.entries()) {
-      if (entry.isTree()) {
-        await this.storeTree(await entry.getTree());
-      } else if (entry.isBlob()) {
-        this.log(`Writing blob ${entry.name()} ${entry.sha()}`);
-        await writeToBlobStream(entry.sha(), this.readObject(entry.sha()));
+    let treeInfo = await this.gitCommand('readObject', {oid: treeId, format: 'parsed'});
+
+    for (let entry of treeInfo.object.entries) {
+      if (entry.type === 'tree') {
+        await this.storeTree(entry.oid);
+      } else if (entry.type === 'blob') {
+        this.log(`Writing blob ${entry.path} ${entry.oid}`);
+        await writeToBlobStream(entry.oid, await this.readObject(entry.oid));
       }
     }
   }
 
   async downloadCommit(sha) {
-    await this.downloadObject(sha);
+    await this.downloadObject('commit', sha);
 
-    let commit = await this.repo.getCommit(sha);
+    let commitInfo = await this.gitCommand('readObject', {oid: sha, format: 'parsed'});
 
-    await this.downloadObject(commit.treeId().toString());
-    let tree = await commit.getTree();
 
-    await this.downloadTree(tree);
+    await this.downloadTree(commitInfo.object.tree);
   }
 
-  async downloadObject(sha) {
-    this.log(`Downloading object ${sha}`);
-    let buffer = await readFromBlobStream(sha);
-    this.writeObject(sha, buffer);
+  async downloadObject(type, sha) {
+    this.log(`Downloading ${type} ${sha}`);
+    let object = await readFromBlobStream(sha);
+
+    await this.gitCommand('writeObject', { type, object, format: 'content' });
   }
 
-  async downloadTree(tree) {
-    for (let entry of tree.entries()) {
-      await this.downloadObject(entry.sha());
-      if (entry.isTree()) {
-        await this.downloadTree(await entry.getTree());
+  async downloadTree(treeId) {
+    await this.downloadObject('tree', treeId);
+
+    let treeInfo =  await this.gitCommand('readObject', { oid: treeId, format: 'parsed' });
+
+    for (let entry of treeInfo.object.entries) {
+      await this.downloadObject(entry.type, entry.oid);
+      if (entry.type === 'tree') {
+        await this.downloadTree(entry.oid);
       }
     }
   }
 
-  async gitCommand(cmd) {
-    return await chdir(this.repoPath, async () =>
-      await shellCommand(`git ${cmd}`)
-    );
+  async gitCommand(cmd, opts={}) {
+    if(!opts.dir) {
+      opts.dir = this.repoPath;
+    }
+
+    return await Git[cmd].call(Git, opts);
   }
 
   async push(commit) {
@@ -82,13 +91,13 @@ class Gitchain {
       if (previousCommit) {
         previousCommitData = {
           type: 'COMMIT',
-          id: previousCommit.sha()
+          id: previousCommit.oid
         };
       }
 
       let transaction = {
         "type": "COMMIT",
-        "id": commit.sha(),
+        "id": commit.oid,
         data: {
           attributes: {
             'blob-store-info': blobStoreMeta(),
@@ -121,7 +130,7 @@ class Gitchain {
       throw new Error(`Path ${this.repoPath} already exists!`);
     }
 
-    this.repo = await Git.Repository.init(this.repoPath, 0);
+    this.repo = await this.gitCommand('init');
 
     let currentSha = headSha;
 
@@ -132,36 +141,19 @@ class Gitchain {
       currentSha = get(commitData, 'data.relationships.previous-commit.data.id');
     } while (currentSha);
 
-    writeFileSync(join(this.gitDir, 'refs/heads/master'), headSha);
-    this.gitCommand('reset --hard');
+    await this.gitCommand('writeRef', { ref: 'refs/heads/master', value: headSha });
+    await this.gitCommand('checkout', { ref: 'master' });
   }
 
   async getCommitDataFromBlockchain(sha) {
     let stateAddress = commitAddress(sha);
     let commit = await request(restApiUrl(`state/${stateAddress}`), {json: true});
-    return decodePayload(commit.data);
+    let payload = decodePayload(commit.data);
+    return payload;
   }
 
   async getCommits(repoPath, commit) {
-    let repo = await Git.Repository.openBare(repoPath);
-    let masterCommit;
-
-    // if specific commit is provided, use that, otherwise use the current master
-    // HEAD
-    if (commit) {
-      masterCommit = await repo.getCommit(commit);
-    } else {
-      masterCommit = await repo.getMasterCommit();
-    }
-
-    return await new Promise((resolve, reject) => {
-      let eventEmitter = masterCommit.history(Git.Revwalk.SORT.REVERSE);
-      eventEmitter.on('end', commits => {
-        resolve(commits);
-      });
-      eventEmitter.on('error', reject);
-      eventEmitter.start();
-    });
+    return (await this.gitCommand('log', { ref: (commit || 'master') })).reverse();
   }
 
   readPrivateKey() {
@@ -176,17 +168,9 @@ class Gitchain {
     return join(this.gitDir, 'objects', sha.slice(0,2), sha.slice(2));
   }
 
-  readObject(sha) {
-    return readFileSync(this.objectPath(sha));
-  }
-
-  writeObject(sha, buffer) {
-    let destPath = this.objectPath(sha);
-    let dir = dirname(destPath);
-
-    if (!existsSync(dir)) { mkdirSync(dir); }
-
-    writeFileSync(destPath, buffer);
+  async readObject(sha) {
+    let { object } = await this.gitCommand('readObject', { oid: sha, format: 'content'});
+    return object;
   }
 
 }
