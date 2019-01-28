@@ -24,15 +24,15 @@ class CLI {
 
     let gitchain = new Gitchain(repoPath, this.options.keydir, { logger: this.log });
 
-    await gitchain.push();
+    return await gitchain.push();
   }
 
   async clone() {
-   let [repoPath, headSha] = this.arguments;
+    let [headSha, repoPath] = this.arguments;
 
-   let gitchain = new Gitchain(repoPath, this.options.keydir, { logger: this.log });
+    let gitchain = new Gitchain(repoPath, this.options.keydir, { logger: this.log });
 
-   await gitchain.clone(headSha);
+    await gitchain.clone(headSha);
   }
 
   async keygen() {
