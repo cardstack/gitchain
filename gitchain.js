@@ -96,11 +96,14 @@ class Gitchain {
     if (!(commitPayload = this.cache.writtenToBlockchain[commit.oid])) {
       commitPayload = await this.writeCommitToBlockchain(commit, previousCommit);
       this.cache.writtenToBlockchain[commit.oid] = commitPayload;
+    } else {
+      this.log(`Commit ${commit.oid} is already written to the blockchain, skipping`);
     }
 
     if (!this.cache.writtenToBlobStore[commit.oid]) {
       await this.storeCommit(commit);
       this.cache.writtenToBlobStore[commit.oid] = true;
+      this.log(`Commit ${commit.oid} is already written to the blob store, skipping`);
     }
 
     return commitPayload;
