@@ -1,9 +1,10 @@
-const { restApiUrl }          = require('./utils/config');
+const { defaultConfig }       = require('./utils/config');
 const { submitAndPoll }       = require('./lib/send-transaction');
 const { decodePayload }       = require('./utils/encryption');
 const defaultLogger           = require('debug')('gitchain');
 const request                 = require('request-promise-native');
 const { get }                 = require('lodash');
+const url                     = require('url');
 
 const fs = require('fs');
 const Git = require('isomorphic-git');
@@ -16,15 +17,25 @@ const { resolve, join }             = require('path');
 
 
 class Gitchain {
-  constructor(repoPath, keydir, { logger, cache }={}) {
+  constructor(repoPath, keydir, { logger, cache, apiBase, blobStorage }={}) {
     this.repoPath   = repoPath;
     this.gitDir     = join(this.repoPath, '.git');
     this.keydir     = keydir;
     this.log        = logger || defaultLogger;
+    this.apiBase    = defaultConfig('GITCHAIN_REST_ENDPOINT', apiBase);
     this.cache      = cache || {
       writtenToBlockchain: {},
       writtenToBlobStore: {}
     };
+
+    this.blobStorageConfig = blobStorage || {
+      type: 'tmpfile',
+      path: 'tmp/blobs'
+    };
+  }
+
+  restApiUrl(path) {
+    return url.resolve(this.apiBase, path);
   }
 
   async storeCommit(commit) {
@@ -36,7 +47,7 @@ class Gitchain {
   }
 
   async writeToBlobStream(key, blob) {
-    await writeToBlobStream(key, blob);
+    await writeToBlobStream(key, blob, this.blobStorageConfig);
   }
 
   async storeTree(treeId) {
@@ -65,7 +76,7 @@ class Gitchain {
 
   async downloadObject(type, sha) {
     this.log(`Downloading ${type} ${sha}`);
-    let object = await readFromBlobStream(sha);
+    let object = await readFromBlobStream(sha, this.blobStorageConfig);
 
     await this.gitCommand('writeObject', { type, object, format: 'content' });
   }
@@ -124,7 +135,7 @@ class Gitchain {
       "id": commit.oid,
       data: {
         attributes: {
-          'blob-store-info': blobStoreMeta(),
+          'blob-store-info': blobStoreMeta(this.blobStorageConfig),
         },
         relationships: {
           'previous-commit': {
@@ -141,7 +152,7 @@ class Gitchain {
     let commitPayload = decodePayload(commitTransaction.payload);
     let commitAddress = transactionAddress(commitPayload);
 
-    this.log("Transaction address", restApiUrl(`state/${commitAddress}`));
+    this.log("Transaction address", this.restApiUrl(`state/${commitAddress}`));
 
     return commitPayload;
   }
@@ -183,7 +194,7 @@ class Gitchain {
 
   async getCommitDataFromBlockchain(sha) {
     let stateAddress = commitAddress(sha);
-    let commit = await request(restApiUrl(`state/${stateAddress}`), {json: true});
+    let commit = await request(this.restApiUrl(`state/${stateAddress}`), {json: true});
     let payload = decodePayload(commit.data);
     return payload;
   }

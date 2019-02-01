@@ -9,7 +9,8 @@ describe("Blob storage", () => {
   });
 
   it("Stores to the blob storage", async () => {
-    await writeToBlobStream("mykey", "data");
-    expect((await readFromBlobStream("mykey")).toString()).to.equal("data");
+    let config = {type: 'tmpfile', path: 'tmp/blobs'};
+    await writeToBlobStream("mykey", "data", config);
+    expect((await readFromBlobStream("mykey", config)).toString()).to.equal("data");
   });
 });

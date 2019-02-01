@@ -2,13 +2,21 @@ const Koa                           = require('koa');
 const log                           = require('debug')('gitchain/http');
 const Router                        = require('koa-router');
 const koaBody                       = require('koa-body');
-const { SERVER_PORT, restApiUrl }   = require('./utils/config');
 const { commitAddress }             = require('./utils/address');
 const request                       = require('request-promise-native');
 const { decodePayload }             = require('./utils/encryption');
+const { resolve }                   = require('url');
+const { defaultConfig }             = require('./utils/config');
+
 
 const app       = new Koa();
 const router    = new Router();
+
+const SERVER_PORT = defaultConfig('SERVER_PORT');
+
+function restApiUrl(path) {
+  return resolve(defaultConfig('GITCHAIN_REST_ENDPOINT'), path);
+}
 
 app.use(koaBody());
 app.use(async (ctx, next) => {
