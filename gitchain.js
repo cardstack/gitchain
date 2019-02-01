@@ -17,7 +17,7 @@ const { resolve, join }             = require('path');
 
 
 class Gitchain {
-  constructor(repoPath, keydir, { logger, cache, apiBase, blobStorage }={}) {
+  constructor(repoPath, keydir, { logger, cache, apiBase, blobStorage, privateKey }={}) {
     this.repoPath   = repoPath;
     this.gitDir     = join(this.repoPath, '.git');
     this.keydir     = keydir;
@@ -32,6 +32,8 @@ class Gitchain {
       type: 'tmpfile',
       path: 'tmp/blobs'
     };
+
+    this.privateKey = privateKey;
   }
 
   restApiUrl(path) {
@@ -204,8 +206,10 @@ class Gitchain {
   }
 
   readPrivateKey() {
-    if (process.env.SAWTOOTH_PRIVATE_KEY) {
-      return process.env.SAWTOOTH_PRIVATE_KEY;
+    let explicitKey = defaultConfig('SAWTOOTH_PRIVATE_KEY', this.privateKey);
+
+    if (explicitKey) {
+      return explicitKey;
     } else {
       return readFileSync(resolve(this.keydir, 'sawtooth.priv'), 'utf8');
     }
