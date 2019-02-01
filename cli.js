@@ -22,7 +22,7 @@ class CLI {
   async push () {
     let [repoPath] = this.arguments;
 
-    let gitchain = new Gitchain(repoPath, this.options.keydir, { logger: this.log });
+    let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
 
     return await gitchain.push();
   }
@@ -30,7 +30,7 @@ class CLI {
   async clone() {
     let [headSha, repoPath] = this.arguments;
 
-    let gitchain = new Gitchain(repoPath, this.options.keydir, { logger: this.log });
+    let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
 
     await gitchain.clone(headSha);
   }

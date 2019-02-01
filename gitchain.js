@@ -17,10 +17,10 @@ const { resolve, join }             = require('path');
 
 
 class Gitchain {
-  constructor(repoPath, keydir, { logger, cache, apiBase, blobStorage, privateKey }={}) {
+  constructor(repoPath, { logger, cache, apiBase, blobStorage, privateKey, keyDir }={}) {
     this.repoPath   = repoPath;
     this.gitDir     = join(this.repoPath, '.git');
-    this.keydir     = keydir;
+    this.keyDir     = keyDir;
     this.log        = logger || defaultLogger;
     this.apiBase    = defaultConfig('GITCHAIN_REST_ENDPOINT', apiBase);
     this.cache      = cache || {
@@ -211,7 +211,7 @@ class Gitchain {
     if (explicitKey) {
       return explicitKey;
     } else {
-      return readFileSync(resolve(this.keydir, 'sawtooth.priv'), 'utf8');
+      return readFileSync(resolve(this.keyDir, 'sawtooth.priv'), 'utf8');
     }
   }
 

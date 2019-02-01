@@ -20,7 +20,7 @@ describe("Caching", () => {
 
 
 
-    let gitchain = new Gitchain('tmp/dummygit', 'tmp/some-key');
+    let gitchain = new Gitchain('tmp/dummygit', { keyDir: 'tmp/some-key' });
     let blobWriteSpy = spy(gitchain, 'writeToBlobStream');
     let blockchainPushSpy = spy(gitchain, 'writeCommitToBlockchain');
 
@@ -36,7 +36,7 @@ describe("Caching", () => {
     expect(blobWriteSpy).to.have.callCount(16);
     expect(blockchainPushSpy).to.have.callCount(4);
 
-    let gitchain2 = new Gitchain('tmp/dummygit', 'tmp/some-key', {cache: gitchain.cache});
+    let gitchain2 = new Gitchain('tmp/dummygit', {cache: gitchain.cache, keyDir: 'tmp/some-key'});
     let blobWriteSpy2 = spy(gitchain2, 'writeToBlobStream');
     let blockchainPushSpy2 = spy(gitchain2, 'writeCommitToBlockchain');
 
@@ -47,7 +47,7 @@ describe("Caching", () => {
     expect(blockchainPushSpy2).to.have.callCount(0);
 
     // a new instance gets its own cache if none is passed in
-    let gitchain3 = new Gitchain('tmp/dummygit', 'tmp/some-key');
+    let gitchain3 = new Gitchain('tmp/dummygit', { keyDir: 'tmp/some-key' });
     let blobWriteSpy3 = spy(gitchain3, 'writeToBlobStream');
     let blockchainPushSpy3 = spy(gitchain3, 'writeCommitToBlockchain');
 
