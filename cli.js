@@ -24,7 +24,7 @@ class CLI {
 
     let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
 
-    return await gitchain.push();
+    return await gitchain.push(this.options.commit);
   }
 
   async clone() {
@@ -45,12 +45,23 @@ class CLI {
     await writeFile(privateKeyPath, privateKey.privateKeyBytes.hexSlice());
   }
 
+  async status() {
+    let [repoPath] = this.arguments;
+
+    let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
+
+    return await gitchain.status();
+  }
 }
 
 const opts = {
   keydir: {
     required: false,
     short: 'k'
+  },
+  commit: {
+    required: false,
+    short: 'c'
   }
 };
 

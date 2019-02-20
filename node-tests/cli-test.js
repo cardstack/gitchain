@@ -107,4 +107,51 @@ describe("CLI", () => {
     expect(fs.readFileSync('tmp/cloned/README', 'utf8')).to.equal("Hello World - version C\n");
 
   }).timeout(20000).slow(6000);
+
+  it("shows the current status of pushing a repo to the blockchain if it is in progress", async() => {
+    await cli("keygen -k tmp/some-key");
+    await shellCommand("mkdir tmp/dummy-repo");
+
+    await Git.init({ dir: 'tmp/dummy-repo' });
+
+    let shas = [];
+
+    for (let content of ["a", "b", "c", "d"]) {
+      fs.writeFileSync("tmp/dummy-repo/content.txt", content);
+      await Git.add({ dir: 'tmp/dummy-repo', filepath: 'content.txt' });
+
+      let sha = await Git.commit({
+        dir: 'tmp/dummy-repo',
+        author: {
+          name: 'Mr. Test',
+          email: 'mrtest@example.com'
+        },
+        message: `Commit ${content}`
+      });
+
+      shas.push(sha);
+    }
+
+    let status = await cli("status -k tmp/some-key tmp/dummy-repo");
+
+    expect(status.totalCommits).to.equal(4);
+    expect(status.syncedCommits).to.equal(0);
+    expect(status.percentage).to.equal(0);
+
+    await cli(`push -k tmp/some-key tmp/dummy-repo -c ${shas[1]}`);
+
+    status = await cli("status -k tmp/some-key tmp/dummy-repo");
+
+    expect(status.totalCommits).to.equal(4);
+    expect(status.syncedCommits).to.equal(2);
+    expect(status.percentage).to.equal(50);
+
+    await cli(`push -k tmp/some-key tmp/dummy-repo`);
+
+    status = await cli("status -k tmp/some-key tmp/dummy-repo");
+    expect(status.totalCommits).to.equal(4);
+    expect(status.syncedCommits).to.equal(4);
+    expect(status.percentage).to.equal(100);
+
+  }).timeout(20000).slow(4000);
 });

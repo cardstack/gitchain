@@ -40,6 +40,65 @@ class Gitchain {
     return url.resolve(this.apiBase, path);
   }
 
+
+  // adapted from https://ai.googleblog.com/2006/06/extra-extra-read-all-about-it-nearly.html
+  async _findFirstIndexOfCondition(haystack, assertion) {
+    let mid, result;
+    let low = 0;
+    let high = haystack.length - 1;
+
+    while(low <= high) {
+      mid = low + (high - low >> 1);
+      result = await assertion(haystack[mid]);
+
+      if(result) {
+        low  = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    return low - 1;
+  }
+
+  async status() {
+    let commits = await this.getCommits(this.gitDir);
+
+    let lastSyncedCommitIndex = await this._findFirstIndexOfCondition(commits, async (commit) => {
+      let address = commitAddress(commit.oid);
+      this.log(`Checking ${commit.oid} (${commits.indexOf(commit)})`);
+      try {
+        await request(this.restApiUrl(`state/${address}`), {json: true});
+        return true;
+      } catch(e) {
+        return false;
+      }
+    });
+
+    let totalCommits = commits.length;
+    let syncedCommits = lastSyncedCommitIndex + 1;
+    let percentage = Math.round(syncedCommits / totalCommits * 100);
+    let lastCommitSha = commits[lastSyncedCommitIndex] && commits[lastSyncedCommitIndex].oid;
+    let lastCommitAddress, lastCommitUrl;
+
+    this.log(`Synced ${syncedCommits} of ${totalCommits}, ${percentage}% complete`);
+    if (lastCommitSha) {
+      this.log(`Last synced sha was ${lastCommitSha}`);
+      lastCommitAddress = commitAddress(lastCommitSha);
+      lastCommitUrl = this.restApiUrl(`state/${lastCommitAddress}`);
+      this.log(`Last synced commit url is ${lastCommitUrl}`);
+    }
+
+    return {
+      totalCommits,
+      syncedCommits,
+      percentage,
+      lastCommitSha,
+      lastCommitAddress,
+      lastCommitUrl
+    };
+  }
+
   async storeCommit(commit) {
     this.log(`Storing commit ${commit.oid}`);
 
