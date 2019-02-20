@@ -3,7 +3,8 @@ const { shellCommand }            = require("../utils/async");
 const fs                          = require('fs');
 const glob                        = require('fast-glob');
 const Git                         = require('isomorphic-git');
-const { cli, setupFixtureRepo }   = require('./test-helper');
+
+const { cli, setupFixtureRepo, setupBareFixtureRepo }   = require('./test-helper');
 
 describe("CLI", () => {
   beforeEach(async () => {
@@ -152,6 +153,36 @@ describe("CLI", () => {
     expect(status.totalCommits).to.equal(4);
     expect(status.syncedCommits).to.equal(4);
     expect(status.percentage).to.equal(100);
+
+  }).timeout(20000).slow(4000);
+
+  it("works with bare repos", async() => {
+    await cli("keygen -k tmp/some-key");
+    await setupBareFixtureRepo('dummygit');
+    let result = await cli("push -k tmp/some-key -c a47c8dc067a1648896f7de6759d25411f8f665a0 tmp/dummygit");
+
+    // should return the head commit
+    expect(result.type).to.equal("COMMIT");
+    expect(result.id).to.equal("a47c8dc067a1648896f7de6759d25411f8f665a0");
+    // stores the previous commit so you can walk back up the chain
+    expect(result.data.relationships['previous-commit'].data.id).to.equal("247e877ae8a62139e3561fd95ac3cfa48cbfab97");
+
+    // the objects should be stored in the object store
+    let blobs = await glob('tmp/blobs/*');
+    expect(blobs.length).to.equal(13);
+
+    await cli("clone a47c8dc067a1648896f7de6759d25411f8f665a0 tmp/cloned");
+
+    let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
+    expect(fullRef).to.equal('a47c8dc067a1648896f7de6759d25411f8f665a0');
+
+    let commits = await Git.log({ dir: 'tmp/cloned' });
+
+    expect(commits.length).to.equal(4);
+
+    expect(commits.map(c => c.oid)).to.deep.equal(["a47c8dc067a1648896f7de6759d25411f8f665a0", "247e877ae8a62139e3561fd95ac3cfa48cbfab97", "23e65d5097a41c4f6f9b2937f807c78296ea3298", "b5d928ed34f07b13cb2c664903b771b12ad2ca29"]);
+
+    expect(fs.readFileSync('tmp/cloned/README', 'utf8')).to.equal("Hello World\n");
 
   }).timeout(20000).slow(4000);
 });

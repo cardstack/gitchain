@@ -13,4 +13,9 @@ async function setupFixtureRepo(repo) {
   await shellCommand(`mv tmp/${repo}/git tmp/${repo}/.git`);
 }
 
-module.exports = { cli, setupFixtureRepo };
+async function setupBareFixtureRepo(repo) {
+  // can't store git repos in fixtures if git recognizes them as repos
+  await shellCommand(`cp -r node-tests/fixtures/${repo}/git tmp/${repo}`);
+}
+
+module.exports = { cli, setupFixtureRepo, setupBareFixtureRepo };

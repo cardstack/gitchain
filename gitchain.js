@@ -20,6 +20,10 @@ class Gitchain {
   constructor(repoPath, { logger, cache, apiBase, blobStorage, privateKey, keyDir }={}) {
     this.repoPath   = repoPath;
     this.gitDir     = join(this.repoPath, '.git');
+    if(existsSync(repoPath) && !existsSync(this.gitDir)) {
+      // treat it as a bare repo because it exists buts it doesn't have a .git dir in it
+      this.gitDir = this.repoPath;
+    }
     this.keyDir     = keyDir;
     this.log        = logger || defaultLogger;
     this.apiBase    = defaultConfig('GITCHAIN_REST_ENDPOINT', apiBase);
@@ -62,7 +66,7 @@ class Gitchain {
   }
 
   async status() {
-    let commits = await this.getCommits(this.gitDir);
+    let commits = await this.getCommits();
 
     let lastSyncedCommitIndex = await this._findFirstIndexOfCondition(commits, async (commit) => {
       let address = commitAddress(commit.oid);
@@ -160,6 +164,10 @@ class Gitchain {
       opts.dir = this.repoPath;
     }
 
+    if (!opts.gitdir) {
+      opts.gitdir = this.gitDir;
+    }
+
     return await Git[cmd].call(Git, opts);
   }
 
@@ -219,7 +227,7 @@ class Gitchain {
   }
 
   async push(commit) {
-    let commits = await this.getCommits(this.gitDir, commit);
+    let commits = await this.getCommits(commit);
     let previousCommit;
     let commitPayload;
 
@@ -260,8 +268,8 @@ class Gitchain {
     return payload;
   }
 
-  async getCommits(repoPath, commit) {
-    return (await this.gitCommand('log', { ref: (commit || 'master') })).reverse();
+  async getCommits(commit) {
+    return (await this.gitCommand('log', { ref: (commit || 'HEAD') })).reverse();
   }
 
   readPrivateKey() {
@@ -272,10 +280,6 @@ class Gitchain {
     } else {
       return readFileSync(resolve(this.keyDir, 'sawtooth.priv'), 'utf8');
     }
-  }
-
-  objectPath(sha) {
-    return join(this.gitDir, 'objects', sha.slice(0,2), sha.slice(2));
   }
 
   async readObject(sha) {
