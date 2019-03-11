@@ -75,7 +75,11 @@ class Gitchain {
         await request(this.restApiUrl(`state/${address}`), {json: true});
         return true;
       } catch(e) {
-        return false;
+        if (e.message.match(/There is no state data at the address specified/)) {
+          return false;
+        } else {
+          throw e;
+        }
       }
     });
 
