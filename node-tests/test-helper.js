@@ -1,6 +1,8 @@
+const url   = require('url');
 const options           = require('options-parser');
 const { shellCommand }  = require("../utils/async");
 const { CLI, opts }     = require('../cli');
+const { defaultConfig }       = require('../utils/config');
 
 async function cli(commandStr) {
   let parsedOpts = options.parse(opts, commandStr);
@@ -18,4 +20,8 @@ async function setupBareFixtureRepo(repo) {
   await shellCommand(`cp -r node-tests/fixtures/${repo}/git tmp/${repo}`);
 }
 
-module.exports = { cli, setupFixtureRepo, setupBareFixtureRepo };
+function restApiUrl(path) {
+  return url.resolve(defaultConfig('GITCHAIN_REST_ENDPOINT'), path);
+}
+
+module.exports = { cli, setupFixtureRepo, setupBareFixtureRepo, restApiUrl };

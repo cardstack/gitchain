@@ -46,6 +46,16 @@ router.get('/commit/:sha', async (ctx, next) => {
   await next();
 });
 
+router.get('/state/:address', async (ctx, next) => {
+
+  let state = await request(restApiUrl(`state/${ctx.params.address}`), {json: true});
+  let payload = decodePayload(state.data);
+
+  ctx.body = payload;
+
+  await next();
+});
+
 app
   .use(router.routes())
   .use(router.allowedMethods());

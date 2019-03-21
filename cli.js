@@ -20,19 +20,19 @@ class CLI {
   }
 
   async push () {
-    let [repoPath] = this.arguments;
+    let [repoPath, tag] = this.arguments;
 
-    let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
+    let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir, bundle: this.options.bundle });
 
-    return await gitchain.push(this.options.commit);
+    return await gitchain.push(tag);
   }
 
   async clone() {
-    let [headSha, repoPath] = this.arguments;
+    let [tag, repoPath] = this.arguments;
 
     let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
 
-    await gitchain.clone(headSha);
+    await gitchain.clone(tag);
   }
 
   async keygen() {
@@ -45,12 +45,18 @@ class CLI {
     await writeFile(privateKeyPath, privateKey.privateKeyBytes.hexSlice());
   }
 
-  async status() {
-    let [repoPath] = this.arguments;
+  async head() {
+    let [tag] = this.arguments;
+
+    return await Gitchain.head(tag, { logger: this.log});
+  }
+
+  async pull() {
+    let [tag, repoPath] = this.arguments;
 
     let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir });
 
-    return await gitchain.status();
+    await gitchain.pull(tag);
   }
 }
 
@@ -58,10 +64,6 @@ const opts = {
   keydir: {
     required: false,
     short: 'k'
-  },
-  commit: {
-    required: false,
-    short: 'c'
   }
 };
 
