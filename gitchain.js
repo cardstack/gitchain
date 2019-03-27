@@ -9,6 +9,7 @@ const { decodePayload }   = require('./utils/encryption');
 const { hash }            = require("./utils/signing");
 const {promisify}         = require('util');
 const extract             = promisify(require('extract-zip'));
+const { get }             = require('lodash');
 
 
 const fs = require('fs');
@@ -16,7 +17,7 @@ const Git = require('isomorphic-git');
 Git.plugins.set('fs', fs);
 
 const { writeToBlobStream, readFromBlobStream, blobStoreMeta }   = require('./lib/blob-storage');
-const { tagAddress }  = require("./utils/address");
+const { tagAddress, commitAddress }  = require("./utils/address");
 const { readFileSync, writeFileSync, existsSync }        = require('fs');
 const { resolve, join }             = require('path');
 
@@ -90,20 +91,10 @@ class Gitchain {
     let push = await request(this.restApiUrl(`state/${stateAddress}`), {json: true});
     let payload = decodePayload(push.data);
 
-    let packSha = payload.data.attributes['pack-sha'];
     let headSha = payload.data.attributes['head-sha'];
 
     this.tmpdir = await tmp.dir({unsafeCleanup: true});
-
-
-
-    let packFile = await readFromBlobStream(packSha, this.blobStorageConfig);
-    const {path, cleanup} = await tmp.file();
-
-    writeFileSync(path, packFile);
-    await extract(path, {dir: this.tmpdir.path});
-
-    await cleanup();
+    await this.downloadAllPackfiles(headSha);
 
     await this.loadCommitFromPack(headSha);
 
@@ -115,6 +106,25 @@ class Gitchain {
 
   }
 
+  async downloadAllPackfiles(sha) {
+
+    while (sha) {
+      let commit = await request(this.restApiUrl(`state/${commitAddress(sha)}`), {json: true});
+      let payload = decodePayload(commit.data);
+
+      let packSha = get(payload, 'data.attributes.pack-sha');
+      let packFile = await readFromBlobStream(packSha, this.blobStorageConfig);
+      let {path, cleanup} = await tmp.file();
+
+      writeFileSync(path, packFile);
+      await extract(path, {dir: this.tmpdir.path});
+      await cleanup();
+
+      sha = get(payload, 'data.relationships.previous-commit.data.id');
+
+    }
+
+  }
 
   async loadCommitFromPack(sha) {
     await this.loadObjectFromPack('commit', sha);
@@ -185,8 +195,15 @@ class Gitchain {
   }
 
   async push(tag) {
+    let head;
 
-    let commits = await this.getCommits();
+    try {
+      head = await Gitchain.head(tag, {logger: this.logger, apiBase: this.apiBase});
+    } catch(e) {
+      // There is no head for this tag
+    }
+
+    let commits = await this.getCommits(head);
 
     let zipData = await this.makePackFile(async () => {
       for (let commit of commits) {
@@ -195,8 +212,6 @@ class Gitchain {
         await this.storeTree(commit.tree);
       }
     });
-
-
 
     let packSha = hash(zipData);
 
@@ -227,8 +242,15 @@ class Gitchain {
 
   }
 
-  async getCommits(commit = 'HEAD') {
-    return (await this.gitCommand('log', { ref: commit })).reverse();
+  async getCommits(since) {
+    let orderedCommits = (await this.gitCommand('log', { ref: 'HEAD' })).reverse();
+
+    if (since) {
+      let index = orderedCommits.findIndex(c => c.oid === since);
+      orderedCommits = orderedCommits.slice(index + 1);
+    }
+
+    return orderedCommits;
   }
 
   async makePackFile(callback) {
