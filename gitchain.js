@@ -82,7 +82,6 @@ class Gitchain {
       if (entry.type === 'tree') {
         await this.storeTree(entry.oid);
       } else if (entry.type === 'blob') {
-        this.log(`Writing blob ${entry.path} ${entry.oid}`);
         await this.writeToPackfile(entry.oid, await this.readObject(entry.oid));
       }
     }
@@ -207,6 +206,11 @@ class Gitchain {
     }
 
     let commits = await this.getCommits(head);
+
+    if (commits.length === 0) {
+      this.log(`Nothing to push, tag ${tag} is already at sha ${head}`);
+      return;
+    }
 
     let zipData = await this.makePackFile(async () => {
       for (let commit of commits) {
