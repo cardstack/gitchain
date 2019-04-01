@@ -58,8 +58,11 @@ class Gitchain {
     let push = await request(Gitchain.restApiUrl(`state/${address}`, apiBase), {json: true});
 
     let payload = decodePayload(push.data);
+    let headSha = payload.data.attributes['head-sha'];
 
-    return payload.data.attributes['head-sha'];
+    log(`Sha of ${tag} is ${headSha}`);
+
+    return headSha;
   }
 
   static restApiUrl(path, apiBase = defaultConfig('GITCHAIN_REST_ENDPOINT')) {
