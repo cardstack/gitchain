@@ -247,6 +247,94 @@ describe("CLI", () => {
   }).timeout(20000).slow(4000);
 
 
+  it("pushes an update to a tag to the blockchain using stub storage", async() => {
+    await cli("keygen -k tmp/some-key");
+    await shellCommand("mkdir tmp/dummy-repo");
+
+    await Git.init({ dir: 'tmp/dummy-repo' });
+
+    let shas = [];
+
+
+    async function writeDummyCommit(content) {
+      fs.writeFileSync("tmp/dummy-repo/content.txt", content);
+      await Git.add({ dir: 'tmp/dummy-repo', filepath: 'content.txt' });
+
+      return await Git.commit({
+        dir: 'tmp/dummy-repo',
+        author: {
+          name: 'Mr. Test',
+          email: 'mrtest@example.com'
+        },
+        message: `Commit ${content}`
+      });
+    }
+
+    for (let content of ["a", "b"]) {
+      let sha = await writeDummyCommit(content);
+      shas.push(sha);
+    }
+
+    let incrementalTag = `incremental-tag-${randomKey()}`;
+
+    await cli(`push -s -k tmp/some-key tmp/dummy-repo ${incrementalTag}`);
+
+    // the objects should be stored in the object store
+    let blobs = await glob('tmp/blobs/*');
+    expect(blobs.length).to.equal(0);
+
+    let address = tagAddress(incrementalTag);
+    let push = decodePayload((await request(Gitchain.restApiUrl(`state/${address}`), {json: true})).data);
+    let headSha = push.data.attributes['head-sha'];
+    let commit = decodePayload((await request(Gitchain.restApiUrl(`state/${commitAddress(headSha)}`), {json: true})).data);
+
+    let firstPushSha = shas[shas.length - 1];
+    expect(commit.id).to.equal(firstPushSha);
+
+    expect(commit.data.relationships['previous-commit'].data).to.not.be.ok;
+    expect(commit.data.attributes.tag).to.equal(incrementalTag);
+    expect(commit.data.attributes['pack-sha']).to.equal(push.data.attributes['pack-sha']);
+
+
+    let head = await cli(`head ${incrementalTag}`);
+
+    expect(head).to.equal(firstPushSha);
+
+
+    for (let content of ["c", "d"]) {
+      let sha = await writeDummyCommit(content);
+      shas.push(sha);
+    }
+
+    await cli(`push -s -k tmp/some-key tmp/dummy-repo ${incrementalTag}`);
+
+    let secondBlobs = await glob('tmp/blobs/*');
+    expect(secondBlobs.length).to.equal(0);
+
+    push = decodePayload((await request(Gitchain.restApiUrl(`state/${address}`), {json: true})).data);
+    headSha = push.data.attributes['head-sha'];
+    commit = decodePayload((await request(Gitchain.restApiUrl(`state/${commitAddress(headSha)}`), {json: true})).data);
+
+
+    expect(commit.id).to.equal(shas[shas.length - 1]);
+    let previousData = commit.data.relationships['previous-commit'].data;
+    expect(previousData).to.be.ok;
+    expect(previousData.type).to.equal("COMMIT");
+    expect(previousData.id).to.equal(firstPushSha);
+
+    expect(commit.data.attributes.tag).to.equal(incrementalTag);
+    expect(commit.data.attributes['pack-sha']).to.equal(push.data.attributes['pack-sha']);
+
+
+
+    head = await cli(`head ${incrementalTag}`);
+
+    expect(head).to.equal(shas[shas.length - 1]);
+
+  }).timeout(20000).slow(4000);
+
+
+
   it("Pulls an updated tag from the blockchain", async() => {
     await cli("keygen -k tmp/some-key");
     await shellCommand("mkdir tmp/dummy-repo");

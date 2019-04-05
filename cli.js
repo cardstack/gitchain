@@ -22,7 +22,13 @@ class CLI {
   async push () {
     let [repoPath, tag] = this.arguments;
 
-    let gitchain = new Gitchain(repoPath, { logger: this.log, keyDir: this.options.keydir, bundle: this.options.bundle });
+    let opts = { logger: this.log, keyDir: this.options.keydir, bundle: this.options.bundle };
+
+    if (this.options.stub) {
+      opts.blobStorage = { type: 'stub' };
+    }
+
+    let gitchain = new Gitchain(repoPath, opts);
 
     return await gitchain.push(tag);
   }
@@ -64,6 +70,11 @@ const opts = {
   keydir: {
     required: false,
     short: 'k'
+  },
+  stub: {
+    required: false,
+    short: 's',
+    flag: true
   }
 };
 

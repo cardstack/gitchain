@@ -180,7 +180,8 @@ class Gitchain {
         attributes: {
           'blob-store-info': blobStoreMeta(this.blobStorageConfig),
           'pack-sha': packSha,
-          'head-sha': commit.oid
+          'head-sha': commit.oid,
+          'timestamp': (new Date()).toISOString()
         }
       }
     };
