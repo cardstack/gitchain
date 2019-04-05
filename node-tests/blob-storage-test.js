@@ -13,4 +13,12 @@ describe("Blob storage", () => {
     await writeToBlobStream("mykey", "data", config);
     expect((await readFromBlobStream("mykey", config)).toString()).to.equal("data");
   });
+
+
+  it("Has stub storage", async () => {
+    let config = {type: 'stub'};
+    await writeToBlobStream("mykey", "data", config);
+    expect((await readFromBlobStream("mykey", config)).length).to.equal(0);
+  });
+
 });

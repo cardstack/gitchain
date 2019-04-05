@@ -48,7 +48,7 @@ class CLI {
   async head() {
     let [tag] = this.arguments;
 
-    return await Gitchain.head(tag, { logger: this.log});
+    return await Gitchain.head(tag || "", { logger: this.log});
   }
 
   async pull() {
