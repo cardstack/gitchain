@@ -65,6 +65,17 @@ class Gitchain {
     return headSha;
   }
 
+  static async tagUrl(tag, { logger, apiBase } = {}) {
+    let log = logger || defaultLogger;
+
+
+    apiBase = apiBase || defaultConfig('GITCHAIN_REST_ENDPOINT', apiBase);
+
+    let address = tagAddress(tag);
+    let url = Gitchain.restApiUrl(`state/${address}`, apiBase);
+    log(`Address of tag ${tag} is ${url}`);
+  }
+
   static restApiUrl(path, apiBase = defaultConfig('GITCHAIN_REST_ENDPOINT')) {
     return url.resolve(apiBase, path);
   }

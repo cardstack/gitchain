@@ -64,6 +64,11 @@ class CLI {
 
     await gitchain.pull(tag);
   }
+
+  async url() {
+    let [tag] = this.arguments;
+    return Gitchain.tagUrl(tag || "", {logger: this.log});
+  }
 }
 
 const opts = {
