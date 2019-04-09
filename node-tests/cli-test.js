@@ -14,11 +14,22 @@ const { cli, setupFixtureRepo, setupBareFixtureRepo }   = require('./test-helper
 const { tagAddress, commitAddress } = require("../utils/address");
 const { decodePayload, randomKey }   = require("../utils/encryption");
 
+let tags;
+// Make a unique tag for testing
+function t(base) {
+  if (tags[base]) { return tags[base]; }
+  let newTag = `${base}-${randomKey()}`;
+  tags[base] = newTag;
+  return newTag;
+}
+
+
 
 describe("CLI", () => {
   beforeEach(async () => {
     await shellCommand("rm -rf tmp");
     await shellCommand("mkdir tmp");
+    tags = {};
   });
 
   it("generates sawtooth keys", async () => {
@@ -29,16 +40,16 @@ describe("CLI", () => {
   it("pushes a simple repo to the blockchain and restores it again", async() => {
     await cli("keygen -k tmp/some-key");
     await setupFixtureRepo('dummygit');
-    let result = await cli("push -k tmp/some-key tmp/dummygit my-tag");
+    let result = await cli(`push -k tmp/some-key tmp/dummygit ${t('my-tag')}`);
 
     expect(result.type).to.equal("PUSH");
-    expect(result.id).to.equal("my-tag");
+    expect(result.id).to.equal(t("my-tag"));
 
     // the objects should be stored in the object store
     let blobs = await glob('tmp/blobs/*');
     expect(blobs.length).to.equal(1);
 
-    await cli("clone my-tag tmp/cloned");
+    await cli(`clone ${t('my-tag')} tmp/cloned`);
 
     let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
     expect(fullRef).to.equal('a47c8dc067a1648896f7de6759d25411f8f665a0');
@@ -57,17 +68,17 @@ describe("CLI", () => {
   it("pushes a repo to the blockchain and restores it again when the repo uses packfiles", async() => {
     await cli("keygen -k tmp/some-key");
     await setupFixtureRepo('dummygit-packed');
-    let result = await cli("push -k tmp/some-key tmp/dummygit-packed packed-tag");
+    let result = await cli(`push -k tmp/some-key tmp/dummygit-packed ${t('packed-tag')}`);
 
     // should return the head commit
     expect(result.type).to.equal("PUSH");
-    expect(result.id).to.equal("packed-tag");
+    expect(result.id).to.equal(t("packed-tag"));
 
     // the objects should be stored in the object store
     let blobs = await glob('tmp/blobs/*');
     expect(blobs.length).to.equal(1);
 
-    await cli("clone packed-tag tmp/cloned");
+    await cli(`clone ${t('packed-tag')} tmp/cloned`);
 
     let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
     expect(fullRef).to.equal('a47c8dc067a1648896f7de6759d25411f8f665a0');
@@ -85,17 +96,17 @@ describe("CLI", () => {
   it("pushes a repo to the blockchain and restores it again when the repo has commits with multiple parents", async() => {
     await cli("keygen -k tmp/some-key");
     await setupFixtureRepo('repo-with-merge');
-    let result = await cli("push -k tmp/some-key tmp/repo-with-merge merged-tag");
+    let result = await cli(`push -k tmp/some-key tmp/repo-with-merge ${t('merged-tag')}`);
 
     // should return the head commit
     expect(result.type).to.equal("PUSH");
-    expect(result.id).to.equal("merged-tag");
+    expect(result.id).to.equal(t('merged-tag'));
 
     // the objects should be stored in the object store
     let blobs = await glob('tmp/blobs/*');
     expect(blobs.length).to.equal(1);
 
-    await cli("clone merged-tag tmp/cloned");
+    await cli(`clone ${t('merged-tag')} tmp/cloned`);
 
     let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
     expect(fullRef).to.equal('93ae4072e3660b23b30b80cfc98620dfbe20ca85');
@@ -115,17 +126,17 @@ describe("CLI", () => {
   it("works with bare repos", async() => {
     await cli("keygen -k tmp/some-key");
     await setupBareFixtureRepo('dummygit');
-    let result = await cli("push -k tmp/some-key tmp/dummygit bare-tag");
+    let result = await cli(`push -k tmp/some-key tmp/dummygit ${t('bare-tag')}`);
 
     // should return the head commit
     expect(result.type).to.equal("PUSH");
-    expect(result.id).to.equal("bare-tag");
+    expect(result.id).to.equal(t('bare-tag'));
 
     // the objects should be stored in the object store
     let blobs = await glob('tmp/blobs/*');
     expect(blobs.length).to.equal(1);
 
-    await cli("clone bare-tag tmp/cloned");
+    await cli(`clone ${t('bare-tag')} tmp/cloned`);
 
     let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
     expect(fullRef).to.equal('a47c8dc067a1648896f7de6759d25411f8f665a0');
@@ -168,7 +179,7 @@ describe("CLI", () => {
       shas.push(sha);
     }
 
-    let incrementalTag = `incremental-tag-${randomKey()}`;
+    let incrementalTag = t('incremental-tag');
 
     await cli(`push -k tmp/some-key tmp/dummy-repo ${incrementalTag}`);
 
@@ -363,13 +374,13 @@ describe("CLI", () => {
       shas.push(sha);
     }
 
-    await cli(`push -k tmp/some-key tmp/dummy-repo pull-tag`);
+    await cli(`push -k tmp/some-key tmp/dummy-repo ${t('pull-tag')}`);
 
-    let head = await cli("head pull-tag");
+    let head = await cli(`head ${t('pull-tag')}`);
 
     expect(head).to.equal(shas[shas.length - 1]);
 
-    await cli(`clone pull-tag tmp/cloned`);
+    await cli(`clone ${t('pull-tag')} tmp/cloned`);
 
     let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
     expect(fullRef).to.equal(head);
@@ -388,13 +399,13 @@ describe("CLI", () => {
       shas.push(sha);
     }
 
-    await cli(`push -k tmp/some-key tmp/dummy-repo pull-tag`);
+    await cli(`push -k tmp/some-key tmp/dummy-repo ${t('pull-tag')}`);
 
-    head = await cli("head pull-tag");
+    head = await cli(`head ${t('pull-tag')}`);
 
     expect(head).to.equal(shas[shas.length - 1]);
 
-    await cli(`pull pull-tag tmp/cloned`);
+    await cli(`pull ${t('pull-tag')} tmp/cloned`);
 
     fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
     expect(fullRef).to.equal(head);
