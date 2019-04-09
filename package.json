@@ -20,7 +20,7 @@
     "concat-stream": "^1.6.2",
     "extract-zip": "^1.6.7",
     "fs-blob-store": "^5.2.1",
-    "isomorphic-git": "^0.51.6",
+    "isomorphic-git": "./isomorphic-git-0.0.0-development.tgz",
     "koa": "^2.6.2",
     "koa-body": "^4.0.4",
     "koa-router": "^7.4.0",

@@ -1722,9 +1722,9 @@ isobject@^3.0.0, isobject@^3.0.1:
   resolved "https://registry.yarnpkg.com/isobject/-/isobject-3.0.1.tgz#4e431e92b11a9731636aa1f9c8d1ccbcfdab78df"
   integrity sha1-TkMekrEalzFjaqH5yNHMvP2reN8=
 
-isomorphic-git@^0.51.6:
-  version "0.51.6"
-  resolved "https://registry.yarnpkg.com/isomorphic-git/-/isomorphic-git-0.51.6.tgz#9773c81447258345a0657794b8838abe63ecc30c"
+isomorphic-git@./isomorphic-git-0.0.0-development.tgz:
+  version "0.0.0-development"
+  resolved "./isomorphic-git-0.0.0-development.tgz#c0773bf804273da884508bac83286b049305c469"
   dependencies:
     async-lock "^1.1.0"
     clean-git-ref "1.0.3"
