@@ -12,13 +12,11 @@
   "author": "Alex Speller",
   "license": "MIT",
   "dependencies": {
-    "archiver": "^3.0.0",
     "await-delay": "^1.0.0",
     "aws-sdk": "^2.364.0",
     "cbor": "^4.1.1",
     "chdir": "^0.0.0",
     "concat-stream": "^1.6.2",
-    "extract-zip": "^1.6.7",
     "fs-blob-store": "^5.2.1",
     "isomorphic-git": "./isomorphic-git-0.0.0-development.tgz",
     "koa": "^2.6.2",

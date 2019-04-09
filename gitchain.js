@@ -3,12 +3,7 @@ const { submitAndPoll }   = require('./lib/send-transaction');
 const defaultLogger       = require('debug')('gitchain');
 const request             = require('request-promise-native');
 const url                 = require('url');
-const archiver            = require('archiver');
-const tmp                 = require('tmp-promise');
 const { decodePayload }   = require('./utils/encryption');
-const { hash }            = require("./utils/signing");
-const {promisify}         = require('util');
-const extract             = promisify(require('extract-zip'));
 const { get }             = require('lodash');
 
 
@@ -85,7 +80,7 @@ class Gitchain {
   }
 
   async storeTree(treeId) {
-    await this.writeToPackfile(treeId, await this.readObject(treeId));
+    await this.writeToPackfile(treeId);
 
     let treeInfo = await this.gitCommand('readObject', {oid: treeId, format: 'parsed'});
 
@@ -93,7 +88,7 @@ class Gitchain {
       if (entry.type === 'tree') {
         await this.storeTree(entry.oid);
       } else if (entry.type === 'blob') {
-        await this.writeToPackfile(entry.oid, await this.readObject(entry.oid));
+        await this.writeToPackfile(entry.oid);
       }
     }
   }
@@ -106,17 +101,10 @@ class Gitchain {
 
     let headSha = payload.data.attributes['head-sha'];
 
-    this.tmpdir = await tmp.dir({unsafeCleanup: true});
     await this.downloadAllPackfiles(headSha);
-
-    await this.loadCommitFromPack(headSha);
-
-    await this.tmpdir.cleanup();
-    delete this.tmpdir;
 
     await this.gitCommand('writeRef', { ref: 'refs/heads/master', value: headSha, force: true });
     await this.gitCommand('checkout', { ref: 'master' });
-
   }
 
   async downloadAllPackfiles(sha) {
@@ -127,14 +115,14 @@ class Gitchain {
 
       let packSha = get(payload, 'data.attributes.pack-sha');
       let packFile = await readFromBlobStream(packSha, this.blobStorageConfig);
-      let {path, cleanup} = await tmp.file();
+
+      let path = join(this.gitDir, "objects/pack", packSha);
 
       writeFileSync(path, packFile);
-      await extract(path, {dir: this.tmpdir.path});
-      await cleanup();
+
+      await this.gitCommand('indexPack', { filepath: join('.git/objects/pack', packSha) });
 
       sha = get(payload, 'data.relationships.previous-commit.data.id');
-
     }
 
   }
@@ -224,19 +212,17 @@ class Gitchain {
       return;
     }
 
-    let zipData = await this.makePackFile(async () => {
+    let { filename, packfile } = await this.makePackFile(async () => {
       for (let commit of commits) {
         this.log(`Storing commit ${commit.oid}`);
-        await this.writeToPackfile(commit.oid, await this.readObject(commit.oid));
+        await this.writeToPackfile(commit.oid);
         await this.storeTree(commit.tree);
       }
     });
 
-    let packSha = hash(zipData);
+    await this.writeToBlobStream(filename, packfile);
 
-    await this.writeToBlobStream(packSha, zipData);
-
-    let pushPayload = await this.writePushToBlockchain(commits[commits.length-1], tag, packSha);
+    let pushPayload = await this.writePushToBlockchain(commits[commits.length-1], tag, filename);
 
     return pushPayload;
   }
@@ -273,45 +259,19 @@ class Gitchain {
   }
 
   async makePackFile(callback) {
-    this.tmpdir = await tmp.dir({unsafeCleanup: true});
+
+    this.oidsToPack = [];
+
     await callback();
 
 
-    const {path, cleanup} = await tmp.file();
-
-    let output = fs.createWriteStream(path);
-    let archive = archiver('zip');
-
-
-
-    return new Promise((resolve, reject) => {
-      archive.pipe(output);
-
-      archive.on('error', function(err) {
-        reject(err);
-      });
-
-      output.on('close', async() => {
-        let zipData = readFileSync(path);
-
-        await cleanup();
-        await this.tmpdir.cleanup();
-        delete this.tmpdir;
-
-        resolve(zipData);
-      });
-
-
-      archive.directory(this.tmpdir.path, false);
-      archive.finalize();
-
+    return await this.gitCommand('packObjects', {
+      oids: this.oidsToPack
     });
-
-
   }
 
-  async writeToPackfile(key, blob) {
-    writeFileSync(join(this.tmpdir.path, key), blob);
+  async writeToPackfile(oid) {
+    this.oidsToPack.push(oid);
   }
 
   async writeToBlobStream(key, blob) {

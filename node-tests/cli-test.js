@@ -5,10 +5,6 @@ const glob                        = require('fast-glob');
 const Git                         = require('isomorphic-git');
 const request                     = require('request-promise-native');
 const { Gitchain }                = require('../gitchain');
-const tmp                         = require('tmp-promise');
-const {promisify}                 = require('util');
-const extract                     = promisify(require('extract-zip'));
-const { basename }                = require('path');
 
 const { cli, setupFixtureRepo, setupBareFixtureRepo }   = require('./test-helper');
 const { tagAddress, commitAddress } = require("../utils/address");
@@ -187,10 +183,6 @@ describe("CLI", () => {
     let blobs = await glob('tmp/blobs/*');
     expect(blobs.length).to.equal(1);
 
-    let firstBlobPath = blobs[0];
-    let extractedFirstBlobDir = await tmp.dir({unsafeCleanup: true});
-    await extract(firstBlobPath, {dir: extractedFirstBlobDir.path});
-
 
     let address = tagAddress(incrementalTag);
     let push = decodePayload((await request(Gitchain.restApiUrl(`state/${address}`), {json: true})).data);
@@ -217,22 +209,6 @@ describe("CLI", () => {
 
     await cli(`push -k tmp/some-key tmp/dummy-repo ${incrementalTag}`);
 
-    let secondBlobs = await glob('tmp/blobs/*');
-    expect(secondBlobs.length).to.equal(2);
-
-    let possibleSecondBlobPaths = secondBlobs.filter(p => p !== firstBlobPath);
-    expect(possibleSecondBlobPaths.length).to.equal(1);
-    let secondBlobPath = possibleSecondBlobPaths[0];
-    let extractedSecondBlobDir = await tmp.dir({unsafeCleanup: true});
-    await extract(secondBlobPath, {dir: extractedSecondBlobDir.path});
-
-    let firstBlobContents = (await glob(extractedFirstBlobDir.path + '/*')).map(p => basename(p));
-    let secondBlobContents = (await glob(extractedSecondBlobDir.path + '/*')).map(p => basename(p));
-
-
-    firstBlobContents.forEach(c => expect(secondBlobContents).to.not.include(c, `First blobs ${c} included in second blobs`));
-    secondBlobContents.forEach(c => expect(firstBlobContents).to.not.include(c, `Second blobs ${c} included in first blobs`));
-
     push = decodePayload((await request(Gitchain.restApiUrl(`state/${address}`), {json: true})).data);
     headSha = push.data.attributes['head-sha'];
     commit = decodePayload((await request(Gitchain.restApiUrl(`state/${commitAddress(headSha)}`), {json: true})).data);
@@ -253,8 +229,6 @@ describe("CLI", () => {
 
     expect(head).to.equal(shas[shas.length - 1]);
 
-    await extractedSecondBlobDir.cleanup();
-    await extractedFirstBlobDir.cleanup();
   }).timeout(20000).slow(4000);
 
 
