@@ -12,10 +12,16 @@ module.exports = async function(publicKey, transaction, state) {
 
   try {
     let currentTagState = decodePayload((await state.getState([address]))[address]);
+    let currentHeadSha = currentTagState.data.attributes['head-sha'];
+
+    if (headSha === currentHeadSha) {
+      // the blockchain is already up to date, don't create a self-referencing loop here
+      return;
+    }
 
     previousCommitData = {
       type: 'COMMIT',
-      id: currentTagState.data.attributes['head-sha']
+      id: currentHeadSha
     };
 
   } catch(e) {
