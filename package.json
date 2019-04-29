@@ -18,7 +18,7 @@
     "chdir": "^0.0.0",
     "concat-stream": "^1.6.2",
     "fs-blob-store": "^5.2.1",
-    "isomorphic-git": "./isomorphic-git-0.0.0-development.tgz",
+    "isomorphic-git": "^0.54.2",
     "koa": "^2.6.2",
     "koa-body": "^4.0.4",
     "koa-router": "^7.4.0",
